@@ -7,7 +7,16 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(
-  this, "Config", "resource://pioneer-study-online-news/Config.jsm"
+  this, "Config", "resource://pioneer-online-news-log-recovery/Config.jsm"
+);
+XPCOMUtils.defineLazyModuleGetter(
+  this, "LogHandler", "resource://pioneer-online-news-log-recovery/lib/LogHandler.jsm"
+);
+XPCOMUtils.defineLazyModuleGetter(
+  this, "NewsIndexedDB", "resource://pioneer-online-news-log-recovery/lib/NewsIndexedDB.jsm"
+);
+XPCOMUtils.defineLazyModuleGetter(
+  this, "Pioneer", "resource://pioneer-online-news-log-recovery/lib/Pioneer.jsm"
 );
 
 
@@ -22,12 +31,22 @@ const REASONS = {
   ADDON_DOWNGRADE:  8, // The add-on is being downgraded.
 };
 const UI_AVAILABLE_NOTIFICATION = "sessionstore-windows-restored";
-const EXPIRATION_DATE_PREF = "extensions.pioneer-online-news-log-recovery.expirationDate";
 
 this.Bootstrap = {
   install() {},
 
   async startup(data, reason) {
+    // Check if the user is opted in to pioneer and if not end the study
+    Pioneer.startup();
+    const events = Pioneer.utils.getAvailableEvents();
+
+    // TODO: Check that the study is still installed
+    const isEligible = await Pioneer.utils.isUserOptedIn();
+    if (!isEligible) {
+      Pioneer.utils.uninstall();
+      return;
+    }
+
     // If the app is starting up, wait until the UI is available before finishing
     // init.
     if (reason === REASONS.APP_STARTUP) {
@@ -48,7 +67,10 @@ this.Bootstrap = {
    * Add-on startup tasks delayed until after session restore so as
    * not to slow down browser startup.
    */
-  async finishStartup() {},
+  async finishStartup() {
+    NewsIndexedDB.startup();
+    LogHandler.startup();
+  },
 
   shutdown(data, reason) {},
 
