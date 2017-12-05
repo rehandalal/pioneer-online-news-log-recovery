@@ -1,0 +1,14 @@
+{
+  "addon": {
+    "version": "1.0.0",
+    "id": "pioneer-online-news-log-recovery@pioneer.mozilla.org",
+    "name": "Pioneer Online News Study - Log Recovery",
+    "minVersion": "55.0",
+    "maxVersion": "*",
+    "multiprocessCompatible": true,
+    "hasEmbeddedWebExtension": false,
+    "creator": "Mozilla",
+    "description": "A patch to accurately gather the online news study logs.",
+    "chrome": "pioneer-online-news-log-recovery"
+  }
+}
