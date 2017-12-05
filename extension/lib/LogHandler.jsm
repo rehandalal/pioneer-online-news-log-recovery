@@ -27,6 +27,9 @@ const UPLOAD_DATE_PREF = "extensions.pioneer-online-news-log-recovery.lastLogUpl
 
 const KILOBYTE = 1024;
 const MEGABYTE = 1024 * KILOBYTE;
+const UPLOAD_LIMIT = 1 * MEGABYTE;
+
+let padding = 0.95;
 
 
 this.LogHandler = {
@@ -37,29 +40,41 @@ this.LogHandler = {
 
   async uploadPings() {
     // upload ping dataset at the most once a day
-    const entries = await LogStorage.getAll();
+    let entries = await LogStorage.getAll();
     const lastUploadDate = PrefUtils.getLongPref(UPLOAD_DATE_PREF, 0);
     const timesinceLastUpload = Date.now() - lastUploadDate;
 
     if (timesinceLastUpload > Config.logSubmissionInterval) {
-      let batch = [];
+      let entriesPingSize = Pioneer.utils.getEncryptedPingSize("online-news-log", 1, entries);
 
-      for (const entry of entries) {
-        batch.push(entry);
+      if (entriesPingSize < UPLOAD_LIMIT) {
+        // If the ping is small enough, just submit it directly
+        await Pioneer.utils.submitEncryptedPing("online-news-log", 1, entries);
+      } else {
+        // Otherwise, break it into batches below the minimum size
+        let originalEntriesLength = entries.length;
+        while (entries.length > 0) {
+          let batchSize = Math.floor(originalEntriesLength * entriesPingSize / UPLOAD_LIMIT * fraction);
+          if (batchSize < 1) {
+            throw new Error('could not submit batch of any size');
+          }
 
-        if (Pioneer.utils.getEncryptedPingSize("online-news-log", 1, batch) > MEGABYTE) {
-          batch.pop();
+          let batch = entries.splice(0, batchSize);
+          let batchPingSize = Pioneer.utils.getEncryptedPingSize("online-news-log", 1, batch);
+
+          if (batchPingSize >= UPLOAD_LIMIT) {
+            // not small enough, put the batch back in the pool,
+            // reduce the batch size and try again
+            padding -= 0.05;
+            entries = batch.concat(entries);
+            continue;
+          }
+
           await Pioneer.utils.submitEncryptedPing("online-news-log", 1, batch);
-          batch = [entry];
+          PrefUtils.setLongPref(UPLOAD_DATE_PREF, Date.now());
+          const lastEntry = batch.pop();
+          LogStorage.delete(IDBKeyRange.upperBound(lastEntry.timestamp));
         }
-      }
-
-      if (batch.length) {
-        await Pioneer.utils.submitEncryptedPing("online-news-log", 1, batch);
-        PrefUtils.setLongPref(UPLOAD_DATE_PREF, Date.now());
-
-        const lastEntry = batch.pop();
-        LogStorage.delete(IDBKeyRange.upperBound(lastEntry.timestamp));
       }
     }
   },
