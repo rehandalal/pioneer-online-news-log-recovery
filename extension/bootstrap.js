@@ -7,6 +7,9 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(
+  this, "AddonManager", "resource://gre/modules/AddonManager.jsm"
+);
+XPCOMUtils.defineLazyModuleGetter(
   this, "Config", "resource://pioneer-online-news-log-recovery/Config.jsm"
 );
 XPCOMUtils.defineLazyModuleGetter(
@@ -40,9 +43,13 @@ this.Bootstrap = {
     Pioneer.startup();
     const events = Pioneer.utils.getAvailableEvents();
 
-    // TODO: Check that the study is still installed
+    const studyAddon = await AddonManager.getAddonByID(
+      "pioneer-study-online-news@pioneer.mozilla.org"
+    );
+    const studyInstalled = studyAddon !== null && studyAddon.isActive;
+
     const isEligible = await Pioneer.utils.isUserOptedIn();
-    if (!isEligible) {
+    if (!isEligible || !studyInstalled) {
       Pioneer.utils.uninstall();
       return;
     }
@@ -72,7 +79,14 @@ this.Bootstrap = {
     LogHandler.startup();
   },
 
-  shutdown(data, reason) {},
+  shutdown(data, reason) {
+    Cu.unload("resource://pioneer-online-news-log-recovery/Config.jsm");
+    Cu.unload("resource://pioneer-online-news-log-recovery/lib/LogHandler.jsm");
+    Cu.unload("resource://pioneer-online-news-log-recovery/lib/LogStorage.jsm");
+    Cu.unload("resource://pioneer-online-news-log-recovery/lib/NewsIndexedDB.jsm");
+    Cu.unload("resource://pioneer-online-news-log-recovery/lib/Pioneer.jsm");
+    Cu.unload("resource://pioneer-online-news-log-recovery/lib/PrefUtils.jsm");
+  },
 
   uninstall() {},
 };
