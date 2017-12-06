@@ -54,7 +54,7 @@ this.LogHandler = {
         // Otherwise, break it into batches below the minimum size
         let originalEntriesLength = entries.length;
         while (entries.length > 0) {
-          let batchSize = Math.floor(originalEntriesLength * entriesPingSize / UPLOAD_LIMIT * fraction);
+          let batchSize = Math.floor(originalEntriesLength * entriesPingSize / UPLOAD_LIMIT * padding);
           if (batchSize < 1) {
             throw new Error('could not submit batch of any size');
           }
