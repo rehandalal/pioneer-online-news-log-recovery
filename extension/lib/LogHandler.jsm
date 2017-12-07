@@ -29,7 +29,7 @@ const KILOBYTE = 1024;
 const MEGABYTE = 1024 * KILOBYTE;
 const UPLOAD_LIMIT = 1 * MEGABYTE;
 
-let padding = 0.95;
+const INITIAL_PADDING = 0.95;
 
 
 this.LogHandler = {
@@ -45,22 +45,26 @@ this.LogHandler = {
     const timesinceLastUpload = Date.now() - lastUploadDate;
 
     if (timesinceLastUpload > Config.logSubmissionInterval) {
-      let entriesPingSize = Pioneer.utils.getEncryptedPingSize("online-news-log", 1, entries);
+      const entriesPingSize = Pioneer.utils.getEncryptedPingSize("online-news-log", 1, entries);
 
       if (entriesPingSize < UPLOAD_LIMIT) {
         // If the ping is small enough, just submit it directly
         await Pioneer.utils.submitEncryptedPing("online-news-log", 1, entries);
       } else {
         // Otherwise, break it into batches below the minimum size
-        let originalEntriesLength = entries.length;
+        const reduceRatio = UPLOAD_LIMIT / entriesPingSize;
+        const originalEntriesLength = entries.length;
+        let padding = INITIAL_PADDING;
+        let batch;
+
         while (entries.length > 0) {
-          let batchSize = Math.floor(originalEntriesLength * entriesPingSize / UPLOAD_LIMIT * padding);
+          const batchSize = Math.floor(originalEntriesLength * reduceRatio * padding);
           if (batchSize < 1) {
             throw new Error('could not submit batch of any size');
           }
 
-          let batch = entries.splice(0, batchSize);
-          let batchPingSize = Pioneer.utils.getEncryptedPingSize("online-news-log", 1, batch);
+          batch = entries.splice(0, batchSize);
+          const batchPingSize = Pioneer.utils.getEncryptedPingSize("online-news-log", 1, batch);
 
           if (batchPingSize >= UPLOAD_LIMIT) {
             // not small enough, put the batch back in the pool,
@@ -71,10 +75,11 @@ this.LogHandler = {
           }
 
           await Pioneer.utils.submitEncryptedPing("online-news-log", 1, batch);
-          PrefUtils.setLongPref(UPLOAD_DATE_PREF, Date.now());
-          const lastEntry = batch.pop();
-          LogStorage.delete(IDBKeyRange.upperBound(lastEntry.timestamp));
         }
+
+        PrefUtils.setLongPref(UPLOAD_DATE_PREF, Date.now());
+        const lastEntry = batch.pop();
+        LogStorage.delete(IDBKeyRange.upperBound(lastEntry.timestamp));
       }
     }
   },
