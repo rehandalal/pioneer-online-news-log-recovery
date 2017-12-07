@@ -21,6 +21,9 @@ XPCOMUtils.defineLazyModuleGetter(
 XPCOMUtils.defineLazyModuleGetter(
   this, "Pioneer", "resource://pioneer-online-news-log-recovery/lib/Pioneer.jsm"
 );
+XPCOMUtils.defineLazyModuleGetter(
+  this, "PrefUtils", "resource://pioneer-online-news-log-recovery/lib/PrefUtils.jsm"
+);
 
 
 const SECOND = 1000;
@@ -92,7 +95,7 @@ this.Bootstrap = {
    * not to slow down browser startup.
    */
   async finishStartup() {
-    NewsIndexedDB.startup();
+    await NewsIndexedDB.startup();
     LogHandler.startup();
   },
 
