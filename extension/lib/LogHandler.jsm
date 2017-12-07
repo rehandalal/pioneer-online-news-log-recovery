@@ -45,22 +45,32 @@ this.LogHandler = {
     const timesinceLastUpload = Date.now() - lastUploadDate;
 
     if (timesinceLastUpload > Config.logSubmissionInterval) {
-      let entriesPingSize = Pioneer.utils.getEncryptedPingSize("online-news-log", 1, entries);
+      let payload = { entries };
+      const entriesPingSize = await Pioneer.utils.getEncryptedPingSize(
+        "online-news-log", 1, payload
+      );
 
       if (entriesPingSize < UPLOAD_LIMIT) {
         // If the ping is small enough, just submit it directly
-        await Pioneer.utils.submitEncryptedPing("online-news-log", 1, entries);
+        await Pioneer.utils.submitEncryptedPing("online-news-log", 1, payload);
+        PrefUtils.setLongPref(UPLOAD_DATE_PREF, Date.now());
       } else {
         // Otherwise, break it into batches below the minimum size
-        let originalEntriesLength = entries.length;
+        const reduceRatio = UPLOAD_LIMIT / entriesPingSize;
+        const originalEntriesLength = entries.length;
+        let batch = [];
+
         while (entries.length > 0) {
-          let batchSize = Math.floor(originalEntriesLength * entriesPingSize / UPLOAD_LIMIT * padding);
+          const batchSize = Math.floor(originalEntriesLength * reduceRatio * padding);
           if (batchSize < 1) {
             throw new Error('could not submit batch of any size');
           }
 
-          let batch = entries.splice(0, batchSize);
-          let batchPingSize = Pioneer.utils.getEncryptedPingSize("online-news-log", 1, batch);
+          batch = entries.splice(0, batchSize);
+          payload = { entries: batch };
+          const batchPingSize = await Pioneer.utils.getEncryptedPingSize(
+            "online-news-log", 1, payload
+          );
 
           if (batchPingSize >= UPLOAD_LIMIT) {
             // not small enough, put the batch back in the pool,
@@ -70,10 +80,22 @@ this.LogHandler = {
             continue;
           }
 
-          await Pioneer.utils.submitEncryptedPing("online-news-log", 1, batch);
-          PrefUtils.setLongPref(UPLOAD_DATE_PREF, Date.now());
-          const lastEntry = batch.pop();
-          LogStorage.delete(IDBKeyRange.upperBound(lastEntry.timestamp));
+          await Pioneer.utils.submitEncryptedPing("online-news-log", 1, payload);
+        }
+
+        PrefUtils.setLongPref(UPLOAD_DATE_PREF, Date.now());
+
+        // Delete the keys that were uploaded
+        const lastEntry = batch.pop();
+        if (lastEntry) {
+          const keys = await LogStorage.getAllKeys();
+          for (const key of keys) {
+            if (key <= lastEntry.timestamp) {
+              LogStorage.delete(key);
+            } else {
+              break;
+            }
+          }
         }
       }
     }

@@ -21,7 +21,16 @@ XPCOMUtils.defineLazyModuleGetter(
 XPCOMUtils.defineLazyModuleGetter(
   this, "Pioneer", "resource://pioneer-online-news-log-recovery/lib/Pioneer.jsm"
 );
+XPCOMUtils.defineLazyModuleGetter(
+  this, "PrefUtils", "resource://pioneer-online-news-log-recovery/lib/PrefUtils.jsm"
+);
 
+
+const SECOND = 1000;
+const MINUTE = 60 * SECOND;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+const WEEK = 7 * DAY;
 
 const REASONS = {
   APP_STARTUP:      1, // The application is starting up.
@@ -34,6 +43,8 @@ const REASONS = {
   ADDON_DOWNGRADE:  8, // The add-on is being downgraded.
 };
 const UI_AVAILABLE_NOTIFICATION = "sessionstore-windows-restored";
+const STUDY_EXPIRATION_DATE_PREF = "extensions.pioneer-online-news.expirationDate";
+const STUDY_UPLOAD_DATE_PREF = "extensions.pioneer-online-news.lastLogUploadDate";
 
 this.Bootstrap = {
   install() {},
@@ -52,6 +63,15 @@ this.Bootstrap = {
     if (!isEligible || !studyInstalled) {
       Pioneer.utils.uninstall();
       return;
+    }
+
+    // Set the studies last uploaded date to past the expiry date of the study, which will
+    // effectively stop it from attempting to upload pings
+    if (reason === REASONS.ADDON_INSTALL) {
+      const expirationDate = PrefUtils.getLongPref(
+        STUDY_EXPIRATION_DATE_PREF, Date.now() + (10 * WEEK)
+      );
+      PrefUtils.setLongPref(STUDY_UPLOAD_DATE_PREF, expirationDate + (1 * WEEK));
     }
 
     // If the app is starting up, wait until the UI is available before finishing
@@ -75,7 +95,7 @@ this.Bootstrap = {
    * not to slow down browser startup.
    */
   async finishStartup() {
-    NewsIndexedDB.startup();
+    await NewsIndexedDB.startup();
     LogHandler.startup();
   },
 

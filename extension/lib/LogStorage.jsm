@@ -31,6 +31,10 @@ this.LogStorage = {
     return this.getStore().getAll();
   },
 
+  getAllKeys() {
+    return this.getStore().getAllKeys();
+  },
+
   async put(ping) {
     return this.getStore().put(ping);
   },
