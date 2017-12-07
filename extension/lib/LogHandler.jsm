@@ -78,8 +78,17 @@ this.LogHandler = {
         }
 
         PrefUtils.setLongPref(UPLOAD_DATE_PREF, Date.now());
+
+        // Delete the keys that were uploaded
         const lastEntry = batch.pop();
-        LogStorage.delete(IDBKeyRange.upperBound(lastEntry.timestamp));
+        const keys = await LogStorage.getAllKeys();
+        for (const key of keys) {
+          if (key <= lastEntry.timestamp) {
+            LogStorage.delete(key);
+          } else {
+            break;
+          }
+        }
       }
     }
   },
